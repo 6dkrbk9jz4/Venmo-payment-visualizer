@@ -14,7 +14,45 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import type { SankeyData } from "@shared/schema";
+import type { SankeyData, SankeyLink as SchemaLink } from "@shared/schema";
+
+const SUPERHEROES = [
+  "Batman", "Superman", "Wonder Woman", "Spider-Man", "Iron Man",
+  "Thor", "Hulk", "Black Widow", "Captain America", "Black Panther",
+  "Aquaman", "Flash", "Green Lantern", "Wolverine", "Deadpool",
+  "Doctor Strange", "Ant-Man", "Hawkeye", "Scarlet Witch", "Vision",
+  "Cyborg", "Shazam", "Supergirl", "Batgirl", "Nightwing",
+  "Robin", "Beast Boy", "Starfire", "Raven", "Green Arrow"
+];
+
+function getSuperheroForName(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return SUPERHEROES[Math.abs(hash) % SUPERHEROES.length];
+}
+
+function getSuperheroInitials(hero: string): string {
+  return hero.split(/[\s-]+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function getSuperheroColor(hero: string): string {
+  const colors: Record<string, string> = {
+    "Batman": "#1a1a2e", "Superman": "#0066cc", "Wonder Woman": "#cc0000",
+    "Spider-Man": "#cc0000", "Iron Man": "#b8860b", "Thor": "#4169e1",
+    "Hulk": "#228b22", "Black Widow": "#2f2f2f", "Captain America": "#0047ab",
+    "Black Panther": "#2d2d2d", "Aquaman": "#00ced1", "Flash": "#dc143c",
+    "Green Lantern": "#00ff00", "Wolverine": "#ffd700", "Deadpool": "#8b0000",
+    "Doctor Strange": "#8b008b", "Ant-Man": "#dc143c", "Hawkeye": "#4b0082",
+    "Scarlet Witch": "#dc143c", "Vision": "#228b22", "Cyborg": "#4682b4",
+    "Shazam": "#ffd700", "Supergirl": "#0066cc", "Batgirl": "#4b0082",
+    "Nightwing": "#1e90ff", "Robin": "#dc143c", "Beast Boy": "#228b22",
+    "Starfire": "#ff8c00", "Raven": "#4b0082", "Green Arrow": "#228b22"
+  };
+  return colors[hero] || "#666666";
+}
 
 interface SankeyDiagramProps {
   data: SankeyData;
@@ -36,20 +74,8 @@ interface LinkExtra {
 type SNode = SankeyNode<NodeExtra, LinkExtra>;
 type SLink = SankeyLink<NodeExtra, LinkExtra>;
 
-const CHART_COLORS = [
-  "hsl(217, 91%, 60%)",
-  "hsl(173, 80%, 40%)",
-  "hsl(280, 65%, 45%)",
-  "hsl(43, 96%, 56%)",
-  "hsl(340, 82%, 52%)",
-  "hsl(142, 76%, 36%)",
-  "hsl(199, 89%, 48%)",
-  "hsl(262, 83%, 58%)",
-  "hsl(24, 95%, 53%)",
-  "hsl(322, 75%, 46%)",
-  "hsl(186, 72%, 38%)",
-  "hsl(45, 93%, 47%)",
-];
+const FLOW_COLOR_POSITIVE = "hsl(142, 76%, 36%)";
+const FLOW_COLOR_NEGATIVE = "hsl(0, 72%, 51%)";
 
 export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>(
   function SankeyDiagram({ data, onNodeClick }, ref) {
@@ -110,12 +136,17 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
     }
   }, [data, dimensions]);
 
-  const colorScale = useMemo(() => {
-    const scale = new Map<string, string>();
-    data.nodes.forEach((node, i) => {
-      scale.set(node.name, CHART_COLORS[i % CHART_COLORS.length]);
+  const superheroMap = useMemo(() => {
+    const map = new Map<string, { hero: string; initials: string; color: string }>();
+    data.nodes.forEach((node) => {
+      const hero = getSuperheroForName(node.name);
+      map.set(node.name, {
+        hero,
+        initials: getSuperheroInitials(hero),
+        color: getSuperheroColor(hero),
+      });
     });
-    return scale;
+    return map;
   }, [data.nodes]);
 
   const handleZoomIn = () => {
@@ -291,6 +322,10 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
                   const isHighlighted =
                     hoveredNode === sourceNode.name ||
                     hoveredNode === targetNode.name;
+                  
+                  const originalLink = data.links[i];
+                  const sentiment = originalLink?.sentiment || "positive";
+                  const linkColor = sentiment === "positive" ? FLOW_COLOR_POSITIVE : FLOW_COLOR_NEGATIVE;
 
                   return (
                     <Tooltip key={i}>
@@ -298,7 +333,7 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
                         <path
                           d={sankeyLinkHorizontal()(link as any) || ""}
                           fill="none"
-                          stroke={colorScale.get(sourceNode.name) || "#888"}
+                          stroke={linkColor}
                           strokeWidth={Math.max(1, (link as SLink).width || 1)}
                           strokeOpacity={isHighlighted ? 0.8 : hoveredNode ? 0.15 : 0.5}
                           className="transition-opacity duration-200 cursor-pointer"
@@ -311,6 +346,9 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
                             {sourceNode.name} → {targetNode.name}
                           </p>
                           <p className="font-mono">{formatCurrency(link.value)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {sentiment === "positive" ? "Received" : "Sent"}
+                          </p>
                         </div>
                       </TooltipContent>
                     </Tooltip>
@@ -322,11 +360,17 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
                 {sankeyData.nodes.map((node, i) => {
                   const sNode = node as SNode;
                   const isHighlighted = hoveredNode === sNode.name;
-                  const nodeColor = colorScale.get(sNode.name) || "#888";
+                  const heroInfo = superheroMap.get(sNode.name) || { hero: "Unknown", initials: "?", color: "#888" };
                   const x0 = sNode.x0 ?? 0;
                   const x1 = sNode.x1 ?? 0;
                   const y0 = sNode.y0 ?? 0;
                   const y1 = sNode.y1 ?? 0;
+                  
+                  const isLeftSide = x0 < dimensions.width / 2;
+                  const avatarRadius = 10;
+                  const avatarX = isLeftSide ? x1 + 8 + avatarRadius : x0 - 8 - avatarRadius;
+                  const avatarY = (y0 + y1) / 2;
+                  const textX = isLeftSide ? x1 + 8 + avatarRadius * 2 + 6 : x0 - 8 - avatarRadius * 2 - 6;
 
                   return (
                     <g
@@ -342,16 +386,34 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
                         y={y0}
                         width={x1 - x0}
                         height={Math.max(1, y1 - y0)}
-                        fill={nodeColor}
+                        fill={heroInfo.color}
                         opacity={isHighlighted ? 1 : hoveredNode ? 0.4 : 0.9}
                         rx={2}
                         className="transition-opacity duration-200"
                       />
+                      <circle
+                        cx={avatarX}
+                        cy={avatarY}
+                        r={avatarRadius}
+                        fill={heroInfo.color}
+                        opacity={isHighlighted ? 1 : hoveredNode ? 0.4 : 0.9}
+                        className="transition-opacity duration-200"
+                      />
                       <text
-                        x={x0 < dimensions.width / 2 ? x1 + 8 : x0 - 8}
-                        y={(y0 + y1) / 2}
+                        x={avatarX}
+                        y={avatarY}
                         dy="0.35em"
-                        textAnchor={x0 < dimensions.width / 2 ? "start" : "end"}
+                        textAnchor="middle"
+                        className="text-[8px] fill-white font-bold pointer-events-none"
+                        opacity={isHighlighted ? 1 : hoveredNode ? 0.4 : 0.9}
+                      >
+                        {heroInfo.initials}
+                      </text>
+                      <text
+                        x={textX}
+                        y={avatarY}
+                        dy="0.35em"
+                        textAnchor={isLeftSide ? "start" : "end"}
                         className="text-xs fill-foreground font-medium pointer-events-none"
                         opacity={isHighlighted ? 1 : hoveredNode ? 0.4 : 0.9}
                       >
@@ -383,24 +445,32 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
               <CollapsibleContent>
                 <ScrollArea className="h-80">
                   <div className="p-3 space-y-1">
-                    {data.nodes.map((node) => (
-                      <button
-                        key={node.name}
-                        className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-xs transition-colors hover-elevate ${
-                          hoveredNode === node.name ? "bg-accent" : ""
-                        }`}
-                        onMouseEnter={() => setHoveredNode(node.name)}
-                        onMouseLeave={() => setHoveredNode(null)}
-                        onClick={() => onNodeClick?.(node.name)}
-                        data-testid={`legend-item-${node.name}`}
-                      >
-                        <div
-                          className="w-3 h-3 rounded-sm shrink-0"
-                          style={{ backgroundColor: colorScale.get(node.name) }}
-                        />
-                        <span className="truncate">{node.name}</span>
-                      </button>
-                    ))}
+                    {data.nodes.map((node) => {
+                      const heroInfo = superheroMap.get(node.name) || { hero: "Unknown", initials: "?", color: "#888" };
+                      return (
+                        <button
+                          key={node.name}
+                          className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-xs transition-colors hover-elevate ${
+                            hoveredNode === node.name ? "bg-accent" : ""
+                          }`}
+                          onMouseEnter={() => setHoveredNode(node.name)}
+                          onMouseLeave={() => setHoveredNode(null)}
+                          onClick={() => onNodeClick?.(node.name)}
+                          data-testid={`legend-item-${node.name}`}
+                        >
+                          <div
+                            className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[7px] font-bold text-white"
+                            style={{ backgroundColor: heroInfo.color }}
+                          >
+                            {heroInfo.initials}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate">{node.name}</span>
+                            <span className="truncate text-[10px] text-muted-foreground">{heroInfo.hero}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               </CollapsibleContent>

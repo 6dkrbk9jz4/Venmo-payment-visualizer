@@ -1,18 +1,22 @@
 import type { Transaction, Flow, SummaryStats, SankeyData } from "@shared/schema";
 import { isMerchant } from "./csv-parser";
 
+export interface FlowWithSentiment extends Flow {
+  sentiment: "positive" | "negative";
+}
+
 export function aggregateFlows(
   transactions: Transaction[],
   hideMerchants: boolean = false,
   aliasMap?: Map<string, string>
-): Flow[] {
+): FlowWithSentiment[] {
   const filtered = hideMerchants
     ? transactions.filter(
         (tx) => !isMerchant(tx.from) && !isMerchant(tx.to)
       )
     : transactions;
 
-  const map = new Map<string, number>();
+  const flowMap = new Map<string, { value: number; positiveSum: number; negativeSum: number }>();
 
   for (const tx of filtered) {
     const from = aliasMap?.get(tx.from) || tx.from;
@@ -24,13 +28,23 @@ export function aggregateFlows(
     if (absAmount === 0) continue;
     
     const key = `${from}→${to}`;
-    map.set(key, (map.get(key) || 0) + absAmount);
+    const existing = flowMap.get(key) || { value: 0, positiveSum: 0, negativeSum: 0 };
+    existing.value += absAmount;
+    
+    if (tx.amount > 0) {
+      existing.positiveSum += absAmount;
+    } else {
+      existing.negativeSum += absAmount;
+    }
+    
+    flowMap.set(key, existing);
   }
 
-  return Array.from(map.entries())
-    .map(([key, value]) => {
+  return Array.from(flowMap.entries())
+    .map(([key, data]) => {
       const [source, target] = key.split("→");
-      return { source, target, value };
+      const sentiment: "positive" | "negative" = data.positiveSum >= data.negativeSum ? "positive" : "negative";
+      return { source, target, value: data.value, sentiment };
     })
     .filter((f) => f.value > 0);
 }
@@ -76,7 +90,7 @@ export function getOriginalPeople(
 }
 
 export function buildSankeyData(
-  flows: Flow[],
+  flows: FlowWithSentiment[],
   people: string[]
 ): SankeyData {
   if (flows.length === 0 || people.length === 0) {
@@ -102,6 +116,7 @@ export function buildSankeyData(
       source: nodeMap.get(f.source)!,
       target: nodeMap.get(f.target)!,
       value: f.value,
+      sentiment: f.sentiment,
     }));
 
   return { nodes, links };
