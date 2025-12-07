@@ -3,7 +3,8 @@ import { isMerchant } from "./csv-parser";
 
 export function aggregateFlows(
   transactions: Transaction[],
-  hideMerchants: boolean = false
+  hideMerchants: boolean = false,
+  aliasMap?: Map<string, string>
 ): Flow[] {
   const filtered = hideMerchants
     ? transactions.filter(
@@ -14,12 +15,15 @@ export function aggregateFlows(
   const map = new Map<string, number>();
 
   for (const tx of filtered) {
-    if (!tx.from || !tx.to || tx.from === tx.to) continue;
+    const from = aliasMap?.get(tx.from) || tx.from;
+    const to = aliasMap?.get(tx.to) || tx.to;
+    
+    if (!from || !to || from === to) continue;
     
     const absAmount = Math.abs(tx.amount);
     if (absAmount === 0) continue;
     
-    const key = `${tx.from}→${tx.to}`;
+    const key = `${from}→${to}`;
     map.set(key, (map.get(key) || 0) + absAmount);
   }
 
@@ -32,6 +36,28 @@ export function aggregateFlows(
 }
 
 export function getUniquePeople(
+  transactions: Transaction[],
+  hideMerchants: boolean = false,
+  aliasMap?: Map<string, string>
+): string[] {
+  const filtered = hideMerchants
+    ? transactions.filter(
+        (tx) => !isMerchant(tx.from) && !isMerchant(tx.to)
+      )
+    : transactions;
+
+  const people = new Set<string>();
+  for (const tx of filtered) {
+    const from = aliasMap?.get(tx.from) || tx.from;
+    const to = aliasMap?.get(tx.to) || tx.to;
+    
+    if (from && from !== "Unknown") people.add(from);
+    if (to && to !== "Unknown") people.add(to);
+  }
+  return Array.from(people).sort();
+}
+
+export function getOriginalPeople(
   transactions: Transaction[],
   hideMerchants: boolean = false
 ): string[] {
@@ -83,7 +109,8 @@ export function buildSankeyData(
 
 export function calculateSummaryStats(
   transactions: Transaction[],
-  hideMerchants: boolean = false
+  hideMerchants: boolean = false,
+  aliasMap?: Map<string, string>
 ): SummaryStats {
   const filtered = hideMerchants
     ? transactions.filter(
@@ -91,7 +118,7 @@ export function calculateSummaryStats(
       )
     : transactions;
 
-  const people = getUniquePeople(filtered, false);
+  const people = getUniquePeople(filtered, false, aliasMap);
   
   const sentByPerson = new Map<string, number>();
   const receivedByPerson = new Map<string, number>();
@@ -100,6 +127,8 @@ export function calculateSummaryStats(
   let totalReceived = 0;
 
   for (const tx of filtered) {
+    const from = aliasMap?.get(tx.from) || tx.from;
+    const to = aliasMap?.get(tx.to) || tx.to;
     const absAmount = Math.abs(tx.amount);
     
     if (tx.amount < 0) {
@@ -109,12 +138,12 @@ export function calculateSummaryStats(
     }
     
     sentByPerson.set(
-      tx.from,
-      (sentByPerson.get(tx.from) || 0) + absAmount
+      from,
+      (sentByPerson.get(from) || 0) + absAmount
     );
     receivedByPerson.set(
-      tx.to,
-      (receivedByPerson.get(tx.to) || 0) + absAmount
+      to,
+      (receivedByPerson.get(to) || 0) + absAmount
     );
   }
 

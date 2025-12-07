@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, forwardRef, useImperativeHandle } from "react";
 import { sankey, sankeyLinkHorizontal, SankeyNode, SankeyLink } from "d3-sankey";
 import { ZoomIn, ZoomOut, RotateCcw, Download, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,10 @@ import type { SankeyData } from "@shared/schema";
 interface SankeyDiagramProps {
   data: SankeyData;
   onNodeClick?: (nodeName: string) => void;
+}
+
+export interface SankeyDiagramHandle {
+  getSvgElement: () => SVGSVGElement | null;
 }
 
 interface NodeExtra {
@@ -47,13 +51,18 @@ const CHART_COLORS = [
   "hsl(45, 93%, 47%)",
 ];
 
-export function SankeyDiagram({ data, onNodeClick }: SankeyDiagramProps) {
+export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>(
+  function SankeyDiagram({ data, onNodeClick }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
   const [transform, setTransform] = useState({ k: 1, x: 0, y: 0 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(true);
+
+  useImperativeHandle(ref, () => ({
+    getSvgElement: () => svgRef.current,
+  }));
 
   useEffect(() => {
     const container = containerRef.current;
@@ -401,4 +410,4 @@ export function SankeyDiagram({ data, onNodeClick }: SankeyDiagramProps) {
       </div>
     </div>
   );
-}
+});

@@ -34,6 +34,7 @@ interface TransactionsTableProps {
   transactions: Transaction[];
   filterPerson?: string;
   onClearFilter?: () => void;
+  aliasMap?: Map<string, string>;
 }
 
 type SortField = "datetime" | "from" | "to" | "amount" | "type";
@@ -43,6 +44,7 @@ export function TransactionsTable({
   transactions,
   filterPerson,
   onClearFilter,
+  aliasMap,
 }: TransactionsTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>("datetime");
@@ -59,12 +61,17 @@ export function TransactionsTable({
     return Array.from(types).sort();
   }, [transactions]);
 
+  const applyAlias = (name: string): string => {
+    return aliasMap?.get(name) || name;
+  };
+
   const filteredAndSorted = useMemo(() => {
     let result = [...transactions];
 
     if (filterPerson) {
+      const aliasedFilter = applyAlias(filterPerson);
       result = result.filter(
-        (tx) => tx.from === filterPerson || tx.to === filterPerson
+        (tx) => applyAlias(tx.from) === aliasedFilter || applyAlias(tx.to) === aliasedFilter
       );
     }
 
@@ -76,8 +83,8 @@ export function TransactionsTable({
       const lower = searchTerm.toLowerCase();
       result = result.filter(
         (tx) =>
-          tx.from.toLowerCase().includes(lower) ||
-          tx.to.toLowerCase().includes(lower) ||
+          applyAlias(tx.from).toLowerCase().includes(lower) ||
+          applyAlias(tx.to).toLowerCase().includes(lower) ||
           tx.note.toLowerCase().includes(lower) ||
           tx.type.toLowerCase().includes(lower) ||
           tx.sourceFile.toLowerCase().includes(lower)
@@ -92,10 +99,10 @@ export function TransactionsTable({
             new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
           break;
         case "from":
-          comparison = a.from.localeCompare(b.from);
+          comparison = applyAlias(a.from).localeCompare(applyAlias(b.from));
           break;
         case "to":
-          comparison = a.to.localeCompare(b.to);
+          comparison = applyAlias(a.to).localeCompare(applyAlias(b.to));
           break;
         case "amount":
           comparison = Math.abs(a.amount) - Math.abs(b.amount);
@@ -108,7 +115,7 @@ export function TransactionsTable({
     });
 
     return result;
-  }, [transactions, filterPerson, searchTerm, sortField, sortDirection, typeFilter]);
+  }, [transactions, filterPerson, searchTerm, sortField, sortDirection, typeFilter, aliasMap]);
 
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -160,8 +167,8 @@ export function TransactionsTable({
     const headers = ["Date", "From", "To", "Amount", "Type", "Note", "Source File"];
     const rows = filteredAndSorted.map((tx) => [
       formatDate(tx.datetime),
-      tx.from,
-      tx.to,
+      applyAlias(tx.from),
+      applyAlias(tx.to),
       tx.amount.toFixed(2),
       tx.type,
       tx.note.replace(/"/g, '""'),
@@ -256,7 +263,7 @@ export function TransactionsTable({
 
         {filterPerson && (
           <Badge variant="secondary" className="gap-1">
-            Person: {filterPerson}
+            Person: {applyAlias(filterPerson)}
             <button
               onClick={onClearFilter}
               className="ml-1 hover:text-foreground"
@@ -358,10 +365,16 @@ export function TransactionsTable({
                   {formatDate(tx.datetime)}
                 </TableCell>
                 <TableCell className="max-w-32 truncate" title={tx.from}>
-                  {tx.from}
+                  {applyAlias(tx.from)}
+                  {aliasMap?.has(tx.from) && (
+                    <span className="text-xs text-muted-foreground ml-1">*</span>
+                  )}
                 </TableCell>
                 <TableCell className="max-w-32 truncate" title={tx.to}>
-                  {tx.to}
+                  {applyAlias(tx.to)}
+                  {aliasMap?.has(tx.to) && (
+                    <span className="text-xs text-muted-foreground ml-1">*</span>
+                  )}
                 </TableCell>
                 <TableCell 
                   className={`text-right font-mono whitespace-nowrap ${
