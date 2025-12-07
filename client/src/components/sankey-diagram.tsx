@@ -211,7 +211,7 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
           </div>
           <h3 className="text-lg font-medium mb-2">No Data to Display</h3>
           <p className="text-sm text-muted-foreground max-w-sm">
-            Upload Venmo CSV files to visualize the flow of money between people.
+            Upload CSV files with To, From, and Amount columns to visualize money flows.
           </p>
         </CardContent>
       </Card>

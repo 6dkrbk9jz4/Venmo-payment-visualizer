@@ -1,15 +1,22 @@
-# Venmo Transaction Visualizer
+# Transaction Flow Visualizer
 
 ## Overview
 
-The Venmo Transaction Visualizer is a browser-based application that enables users to upload multiple Venmo CSV statements, parse and normalize transaction data, and visualize money flows between people using interactive Sankey diagrams. The application processes all data client-side without requiring a backend server, providing privacy and instant analysis of financial transactions.
+The Transaction Flow Visualizer is a browser-based application that enables users to upload CSV files containing transaction data (with To, From, and Amount columns) and visualize money flows between people using interactive Sankey diagrams. Originally designed for Venmo statements, it now supports any generic CSV format with flexible column mapping. The application processes all data client-side without requiring a backend server, providing privacy and instant analysis of financial transactions.
 
 Key features include:
-- Multi-file CSV upload and parsing
+- Multi-file CSV upload and parsing (supports Venmo and generic CSV formats)
+- Flexible column auto-detection (To/From/Amount with many variations)
 - Interactive Sankey diagram visualization showing money flows between individuals
+- Color-coded flows: green for received money, red for sent money
+- Superhero avatar system for visual person identification
 - Filterable transaction table with sorting and pagination
 - Summary statistics and analytics
-- Merchant filtering capability
+- Alias mapping for consolidating person names
+- Date range filtering
+- Session persistence with localStorage
+- Merchant filtering and clustering capability
+- Export functionality (CSV, JSON, PNG)
 - Dark/light theme support
 - Fully client-side processing for data privacy
 

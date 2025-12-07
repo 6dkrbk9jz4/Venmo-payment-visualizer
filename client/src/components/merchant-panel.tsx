@@ -111,7 +111,7 @@ export function MerchantPanel({ transactions }: MerchantPanelProps) {
           </div>
           <h3 className="text-lg font-medium mb-2">No Merchant Data</h3>
           <p className="text-sm text-muted-foreground max-w-sm">
-            Upload Venmo CSV files to see merchant spending analysis.
+            Upload CSV files to see merchant spending analysis.
           </p>
         </div>
       </div>

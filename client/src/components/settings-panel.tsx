@@ -204,7 +204,7 @@ export function SettingsPanel({
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Venmo Flow Visualizer processes your transaction data entirely in your browser.
+            Transaction Flow Visualizer processes your data entirely in your browser.
             No data is sent to any server — your financial information stays private and secure.
           </p>
         </CardContent>

@@ -29,6 +29,7 @@ import {
   getOriginalPeople,
   buildSankeyData,
   calculateSummaryStats,
+  type FlowWithSentiment,
 } from "@/lib/aggregator";
 import { buildAliasMap, type AliasMapping } from "@/lib/alias-manager";
 import type { Transaction, UploadedFile, Flow, SankeyData, SummaryStats as SummaryStatsType } from "@shared/schema";
@@ -80,7 +81,7 @@ export default function Home() {
     [transactions, hideMerchants]
   );
 
-  const flows: Flow[] = useMemo(
+  const flows: FlowWithSentiment[] = useMemo(
     () => aggregateFlows(filteredByDate, hideMerchants, aliasMap),
     [filteredByDate, hideMerchants, aliasMap]
   );
@@ -240,7 +241,7 @@ export default function Home() {
               <BarChart3 className="h-4 w-4 text-primary-foreground" />
             </div>
             <h1 className="text-lg font-semibold tracking-tight">
-              Venmo Flow Visualizer
+              Transaction Flow Visualizer
             </h1>
           </div>
         </div>

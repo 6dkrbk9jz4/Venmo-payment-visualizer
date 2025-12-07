@@ -83,40 +83,89 @@ export function isMerchant(name: string): boolean {
 function parseSignedAmount(value: string): number {
   if (!value) return 0;
   const trimmed = value.trim();
-  const cleaned = trimmed.replace(/[$,\s]/g, "");
+  
+  // Check for parentheses format (common in accounting: "(100.00)" means -100)
+  const isParenthesisNegative = trimmed.startsWith("(") && trimmed.endsWith(")");
+  
+  // Remove currency symbols, commas, spaces, and parentheses
+  // Supports: $, €, £, ¥, and other common currency symbols
+  let cleaned = trimmed.replace(/[$€£¥₹₽,\s()]/g, "");
+  
+  // Handle "CR" or "DR" suffixes (credit/debit notation)
+  const isDebit = cleaned.toUpperCase().endsWith("DR");
+  const isCredit = cleaned.toUpperCase().endsWith("CR");
+  cleaned = cleaned.replace(/(CR|DR|cr|dr)$/i, "");
+  
   const num = parseFloat(cleaned);
   if (isNaN(num)) return 0;
+  
+  // Apply sign based on format
+  if (isParenthesisNegative) return -Math.abs(num);
+  if (isDebit) return -Math.abs(num);
+  if (isCredit) return Math.abs(num);
+  
   return num;
 }
 
 function parseDate(value: string): Date {
   if (!value) return new Date();
   const trimmed = value.trim();
-  const parsed = new Date(trimmed);
-  return isNaN(parsed.getTime()) ? new Date() : parsed;
+  
+  // Try standard parsing first
+  let parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) return parsed;
+  
+  // Try common date formats
+  // DD/MM/YYYY or DD-MM-YYYY (European format)
+  const euroMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (euroMatch) {
+    const [, day, month, year] = euroMatch;
+    parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  
+  // MM/DD/YYYY or MM-DD-YYYY (US format - already handled by Date constructor usually)
+  const usMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (usMatch) {
+    let [, month, day, year] = usMatch;
+    let yearNum = parseInt(year);
+    if (yearNum < 100) yearNum += 2000; // Handle 2-digit years
+    parsed = new Date(yearNum, parseInt(month) - 1, parseInt(day));
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  
+  // YYYY/MM/DD or YYYY-MM-DD (ISO format)
+  const isoMatch = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  
+  return new Date();
 }
 
 function normalizeHeader(header: string): string {
   return (header || "").toLowerCase().trim().replace(/[^a-z0-9]/g, "");
 }
 
-const VENMO_HEADER_MAPPINGS: Record<string, string[]> = {
-  id: ["id", "transactionid"],
-  datetime: ["datetime", "date", "timestamp", "createdat"],
-  type: ["type", "transactiontype"],
-  status: ["status"],
-  note: ["note", "description", "memo"],
-  from: ["from", "sender", "fromuser"],
-  to: ["to", "recipient", "touser"],
-  amount: ["amounttotal", "amount", "total", "amountusd"],
-  tip: ["tip", "tipamount"],
-  tax: ["tax", "taxamount"],
-  fee: ["fee", "feeamount"],
+const HEADER_MAPPINGS: Record<string, string[]> = {
+  id: ["id", "transactionid", "txid", "transid", "referenceid", "ref", "transactionref"],
+  datetime: ["datetime", "date", "timestamp", "createdat", "time", "transactiondate", "paymentdate", "processeddate", "completeddate"],
+  type: ["type", "transactiontype", "paymenttype", "category", "txtype"],
+  status: ["status", "state", "paymentstatus", "txstatus"],
+  note: ["note", "description", "memo", "message", "comment", "details", "purpose", "reason"],
+  from: ["from", "sender", "fromuser", "payer", "source", "debitfrom", "paid by", "sentby", "origin", "fromname", "sendername", "payername"],
+  to: ["to", "recipient", "touser", "payee", "destination", "creditto", "paid to", "sentto", "receiver", "toname", "recipientname", "payeename", "beneficiary"],
+  amount: ["amounttotal", "amount", "total", "amountusd", "value", "sum", "payment", "transactionamount", "netamount", "grossamount", "price", "cost", "debit", "credit"],
+  tip: ["tip", "tipamount", "gratuity"],
+  tax: ["tax", "taxamount", "salestax", "vat"],
+  fee: ["fee", "feeamount", "servicefee", "transactionfee", "processingfee"],
 };
 
 function findColumnIndex(headers: string[], fieldName: string): number {
   const normalizedHeaders = headers.map(normalizeHeader);
-  const possibleNames = VENMO_HEADER_MAPPINGS[fieldName] || [fieldName];
+  const possibleNames = HEADER_MAPPINGS[fieldName] || [fieldName];
   
   for (const name of possibleNames) {
     const normalizedName = normalizeHeader(name);

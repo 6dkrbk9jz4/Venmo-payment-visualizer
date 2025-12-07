@@ -202,7 +202,7 @@ export function FileUpload({
       {files.length === 0 && errors.length === 0 && (
         <div className="flex-1 flex items-center justify-center p-4">
           <p className="text-sm text-muted-foreground text-center">
-            Upload Venmo CSV statements to visualize your transaction flows
+            Upload CSV files with To, From, and Amount columns
           </p>
         </div>
       )}

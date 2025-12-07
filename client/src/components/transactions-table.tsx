@@ -217,7 +217,7 @@ export function TransactionsTable({
           </div>
           <h3 className="text-lg font-medium mb-2">No Transactions</h3>
           <p className="text-sm text-muted-foreground max-w-sm">
-            Upload Venmo CSV files to see your transaction data here.
+            Upload CSV files to see your transaction data here.
           </p>
         </div>
       </Card>
