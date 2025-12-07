@@ -1,0 +1,404 @@
+import { useEffect, useRef, useState, useMemo } from "react";
+import { sankey, sankeyLinkHorizontal, SankeyNode, SankeyLink } from "d3-sankey";
+import { ZoomIn, ZoomOut, RotateCcw, Download, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import type { SankeyData } from "@shared/schema";
+
+interface SankeyDiagramProps {
+  data: SankeyData;
+  onNodeClick?: (nodeName: string) => void;
+}
+
+interface NodeExtra {
+  name: string;
+}
+
+interface LinkExtra {
+  value: number;
+}
+
+type SNode = SankeyNode<NodeExtra, LinkExtra>;
+type SLink = SankeyLink<NodeExtra, LinkExtra>;
+
+const CHART_COLORS = [
+  "hsl(217, 91%, 60%)",
+  "hsl(173, 80%, 40%)",
+  "hsl(280, 65%, 45%)",
+  "hsl(43, 96%, 56%)",
+  "hsl(340, 82%, 52%)",
+  "hsl(142, 76%, 36%)",
+  "hsl(199, 89%, 48%)",
+  "hsl(262, 83%, 58%)",
+  "hsl(24, 95%, 53%)",
+  "hsl(322, 75%, 46%)",
+  "hsl(186, 72%, 38%)",
+  "hsl(45, 93%, 47%)",
+];
+
+export function SankeyDiagram({ data, onNodeClick }: SankeyDiagramProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
+  const [transform, setTransform] = useState({ k: 1, x: 0, y: 0 });
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [legendOpen, setLegendOpen] = useState(true);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setDimensions({
+        width: Math.max(width - 32, 400),
+        height: Math.max(height - 80, 400),
+      });
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  const sankeyData = useMemo(() => {
+    if (!data.nodes.length || !data.links.length) return null;
+
+    const nodesCopy = data.nodes.map((n) => ({ ...n }));
+    const linksCopy = data.links.map((l) => ({ ...l }));
+
+    const validLinks = linksCopy.filter(
+      (l) => l.source !== l.target && l.value > 0
+    );
+
+    if (validLinks.length === 0) return null;
+
+    const sankeyGenerator = sankey<NodeExtra, LinkExtra>()
+      .nodeWidth(16)
+      .nodePadding(12)
+      .extent([
+        [20, 20],
+        [dimensions.width - 20, dimensions.height - 20],
+      ]);
+
+    try {
+      return sankeyGenerator({
+        nodes: nodesCopy,
+        links: validLinks,
+      });
+    } catch {
+      return null;
+    }
+  }, [data, dimensions]);
+
+  const colorScale = useMemo(() => {
+    const scale = new Map<string, string>();
+    data.nodes.forEach((node, i) => {
+      scale.set(node.name, CHART_COLORS[i % CHART_COLORS.length]);
+    });
+    return scale;
+  }, [data.nodes]);
+
+  const handleZoomIn = () => {
+    setTransform((t) => ({ ...t, k: Math.min(t.k * 1.2, 4) }));
+  };
+
+  const handleZoomOut = () => {
+    setTransform((t) => ({ ...t, k: Math.max(t.k / 1.2, 0.25) }));
+  };
+
+  const handleReset = () => {
+    setTransform({ k: 1, x: 0, y: 0 });
+  };
+
+  const handleExport = () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svg);
+    const blob = new Blob([svgString], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "venmo-flow-diagram.svg";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+    }).format(value);
+  };
+
+  if (!data.nodes.length || !data.links.length) {
+    return (
+      <Card className="h-full flex items-center justify-center">
+        <CardContent className="text-center py-12">
+          <div className="p-4 rounded-full bg-muted inline-block mb-4">
+            <svg
+              className="h-8 w-8 text-muted-foreground"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M4 4h5v5H4z" />
+              <path d="M15 4h5v5h-5z" />
+              <path d="M4 15h5v5H4z" />
+              <path d="M15 15h5v5h-5z" />
+              <path d="M9 6.5h6" />
+              <path d="M9 17.5h6" />
+              <path d="M6.5 9v6" />
+              <path d="M17.5 9v6" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium mb-2">No Data to Display</h3>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Upload Venmo CSV files to visualize the flow of money between people.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!sankeyData) {
+    return (
+      <Card className="h-full flex items-center justify-center">
+        <CardContent className="text-center py-12">
+          <p className="text-muted-foreground">Unable to generate diagram - check your data format</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="h-full flex flex-col">
+      <div className="flex items-center justify-between gap-2 p-4 border-b shrink-0">
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleZoomIn}
+                data-testid="button-zoom-in"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Zoom In</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleZoomOut}
+                data-testid="button-zoom-out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Zoom Out</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleReset}
+                data-testid="button-reset-view"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Reset View</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground"
+              >
+                <Info className="h-3 w-3 mr-1" />
+                Click nodes to filter
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Click on a person to filter the transactions table</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleExport}
+                data-testid="button-export-svg"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Export as SVG</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        <div className="flex-1 overflow-hidden bg-background relative">
+          <svg
+            ref={svgRef}
+            width={dimensions.width}
+            height={dimensions.height}
+            className="w-full h-full"
+            data-testid="sankey-svg"
+          >
+            <g
+              transform={`translate(${transform.x}, ${transform.y}) scale(${transform.k})`}
+            >
+              <g className="links">
+                {sankeyData.links.map((link, i) => {
+                  const sourceNode = link.source as SNode;
+                  const targetNode = link.target as SNode;
+                  const isHighlighted =
+                    hoveredNode === sourceNode.name ||
+                    hoveredNode === targetNode.name;
+
+                  return (
+                    <Tooltip key={i}>
+                      <TooltipTrigger asChild>
+                        <path
+                          d={sankeyLinkHorizontal()(link as any) || ""}
+                          fill="none"
+                          stroke={colorScale.get(sourceNode.name) || "#888"}
+                          strokeWidth={Math.max(1, (link as SLink).width || 1)}
+                          strokeOpacity={isHighlighted ? 0.8 : hoveredNode ? 0.15 : 0.5}
+                          className="transition-opacity duration-200 cursor-pointer"
+                          data-testid={`link-${sourceNode.name}-${targetNode.name}`}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm">
+                          <p className="font-medium">
+                            {sourceNode.name} → {targetNode.name}
+                          </p>
+                          <p className="font-mono">{formatCurrency(link.value)}</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </g>
+
+              <g className="nodes">
+                {sankeyData.nodes.map((node, i) => {
+                  const sNode = node as SNode;
+                  const isHighlighted = hoveredNode === sNode.name;
+                  const nodeColor = colorScale.get(sNode.name) || "#888";
+                  const x0 = sNode.x0 ?? 0;
+                  const x1 = sNode.x1 ?? 0;
+                  const y0 = sNode.y0 ?? 0;
+                  const y1 = sNode.y1 ?? 0;
+
+                  return (
+                    <g
+                      key={i}
+                      className="cursor-pointer"
+                      onMouseEnter={() => setHoveredNode(sNode.name)}
+                      onMouseLeave={() => setHoveredNode(null)}
+                      onClick={() => onNodeClick?.(sNode.name)}
+                      data-testid={`node-${sNode.name}`}
+                    >
+                      <rect
+                        x={x0}
+                        y={y0}
+                        width={x1 - x0}
+                        height={Math.max(1, y1 - y0)}
+                        fill={nodeColor}
+                        opacity={isHighlighted ? 1 : hoveredNode ? 0.4 : 0.9}
+                        rx={2}
+                        className="transition-opacity duration-200"
+                      />
+                      <text
+                        x={x0 < dimensions.width / 2 ? x1 + 8 : x0 - 8}
+                        y={(y0 + y1) / 2}
+                        dy="0.35em"
+                        textAnchor={x0 < dimensions.width / 2 ? "start" : "end"}
+                        className="text-xs fill-foreground font-medium pointer-events-none"
+                        opacity={isHighlighted ? 1 : hoveredNode ? 0.4 : 0.9}
+                      >
+                        {sNode.name}
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            </g>
+          </svg>
+        </div>
+
+        {data.nodes.length > 0 && (
+          <div className="w-48 border-l shrink-0 bg-background">
+            <Collapsible open={legendOpen} onOpenChange={setLegendOpen}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between rounded-none border-b h-10 px-3"
+                  data-testid="button-toggle-legend"
+                >
+                  <span className="text-xs font-medium">Legend</span>
+                  <span className="text-xs text-muted-foreground">
+                    {legendOpen ? "Hide" : "Show"}
+                  </span>
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ScrollArea className="h-80">
+                  <div className="p-3 space-y-1">
+                    {data.nodes.map((node) => (
+                      <button
+                        key={node.name}
+                        className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-xs transition-colors hover-elevate ${
+                          hoveredNode === node.name ? "bg-accent" : ""
+                        }`}
+                        onMouseEnter={() => setHoveredNode(node.name)}
+                        onMouseLeave={() => setHoveredNode(null)}
+                        onClick={() => onNodeClick?.(node.name)}
+                        data-testid={`legend-item-${node.name}`}
+                      >
+                        <div
+                          className="w-3 h-3 rounded-sm shrink-0"
+                          style={{ backgroundColor: colorScale.get(node.name) }}
+                        />
+                        <span className="truncate">{node.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
