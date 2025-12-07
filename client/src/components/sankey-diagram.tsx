@@ -464,10 +464,7 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
                           >
                             {heroInfo.initials}
                           </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="truncate">{node.name}</span>
-                            <span className="truncate text-[10px] text-muted-foreground">{heroInfo.hero}</span>
-                          </div>
+                          <span className="truncate">{node.name}</span>
                         </button>
                       );
                     })}
