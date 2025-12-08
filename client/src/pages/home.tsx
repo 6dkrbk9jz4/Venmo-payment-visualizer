@@ -241,7 +241,7 @@ export default function Home() {
               <BarChart3 className="h-4 w-4 text-primary-foreground" />
             </div>
             <h1 className="text-lg font-semibold tracking-tight">
-              Transaction Flow Visualizer
+              Venmo Payment Visualizer
             </h1>
           </div>
         </div>
@@ -253,7 +253,7 @@ export default function Home() {
           {UploadSidebar}
         </aside>
 
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0">
           <Tabs 
             value={activeTab} 
             onValueChange={setActiveTab} 
@@ -320,9 +320,9 @@ export default function Home() {
               </TabsList>
             </div>
 
-            <TabsContent value="sankey" className="flex-1 m-0 overflow-hidden">
-              <div className="h-full flex flex-col lg:flex-row">
-                <div className="flex-1 min-w-0 overflow-hidden">
+            <TabsContent value="sankey" className="flex-1 m-0">
+              <div className="h-full flex flex-col">
+                <div className="flex-1 min-w-0 ">
                   <SankeyDiagram
                     ref={sankeyRef}
                     data={sankeyData}
@@ -330,14 +330,14 @@ export default function Home() {
                   />
                 </div>
                 {transactions.length > 0 && (
-                  <div className="lg:w-96 border-t lg:border-t-0 lg:border-l shrink-0 overflow-auto p-4">
+                  <div className="border-t lg:border-t-0 lg:border-l shrink-0 overflow-auto p-4">
                     <SummaryStats stats={stats} />
                   </div>
                 )}
               </div>
             </TabsContent>
 
-            <TabsContent value="table" className="flex-1 m-0 overflow-hidden">
+            <TabsContent value="table" className="flex-1 m-0 ">
               <TransactionsTable
                 transactions={filteredByDate}
                 filterPerson={filterPerson || undefined}
