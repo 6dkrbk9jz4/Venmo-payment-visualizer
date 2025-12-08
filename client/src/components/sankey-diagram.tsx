@@ -38,20 +38,15 @@ function getSuperheroInitials(hero: string): string {
   return hero.split(/[\s-]+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function getSuperheroColor(hero: string): string {
-  const colors: Record<string, string> = {
-    "Batman": "#1a1a2e", "Superman": "#0066cc", "Wonder Woman": "#cc0000",
-    "Spider-Man": "#cc0000", "Iron Man": "#b8860b", "Thor": "#4169e1",
-    "Hulk": "#228b22", "Black Widow": "#2f2f2f", "Captain America": "#0047ab",
-    "Black Panther": "#2d2d2d", "Aquaman": "#00ced1", "Flash": "#dc143c",
-    "Green Lantern": "#00ff00", "Wolverine": "#ffd700", "Deadpool": "#8b0000",
-    "Doctor Strange": "#8b008b", "Ant-Man": "#dc143c", "Hawkeye": "#4b0082",
-    "Scarlet Witch": "#dc143c", "Vision": "#228b22", "Cyborg": "#4682b4",
-    "Shazam": "#ffd700", "Supergirl": "#0066cc", "Batgirl": "#4b0082",
-    "Nightwing": "#1e90ff", "Robin": "#dc143c", "Beast Boy": "#228b22",
-    "Starfire": "#ff8c00", "Raven": "#4b0082", "Green Arrow": "#228b22"
-  };
-  return colors[hero] || "#666666";
+function getSuperheroColor(): string {
+  const colors = [
+    "#1a1a2e", "#0066cc", "#cc0000", "#b8860b", "#4169e1",
+    "#228b22", "#2f2f2f", "#0047ab", "#2d2d2d", "#00ced1",
+    "#dc143c", "#00ff00", "#ffd700", "#8b0000", "#8b008b",
+    "#4b0082", "#4682b4", "#ff8c00"
+  ];
+  
+  return colors[Math.floor(Math.random() * colors.length)];
 }
 
 interface SankeyDiagramProps {
@@ -139,11 +134,10 @@ export const SankeyDiagram = forwardRef<SankeyDiagramHandle, SankeyDiagramProps>
   const superheroMap = useMemo(() => {
     const map = new Map<string, { hero: string; initials: string; color: string }>();
     data.nodes.forEach((node) => {
-      const hero = getSuperheroForName(node.name);
       map.set(node.name, {
-        hero,
-        initials: getSuperheroInitials(hero),
-        color: getSuperheroColor(hero),
+        hero: node.name,
+        initials: getSuperheroInitials(node.name),
+        color: getSuperheroColor(node.name),
       });
     });
     return map;
